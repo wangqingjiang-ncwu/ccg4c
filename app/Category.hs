@@ -7,7 +7,6 @@ module Category (
     seps,          -- [Sep]
     Prim,          -- String
     primitives,    -- [Prim]
-    cateEqual,     -- Category -> Category -> Bool
     nilCate,       -- Category
     xCate,         -- Category
     sCate,         -- Category
@@ -98,16 +97,18 @@ instance Ord Category where
     Primitive _ < X = False
     Derivative _ _ _ < X = False
     Derivative _ _ _ < Primitive _ = False
-    Nil <= X = False
-    Nil <= Primitive _ = False
-    Nil <= Derivative _ _ _ = False
+    Nil <= Nil = True
+    Nil <= X = True
+    Nil <= Primitive _ = True
+    Nil <= Derivative _ _ _ = True
     X <= Nil = False
-    X <= Primitive _ = False
-    X <= Derivative _ _ _ = False
+    X <= X = True
+    X <= Primitive _ = True
+    X <= Derivative _ _ _ = True
     Primitive _ <= Nil = False
     Primitive _ <= X = False
     Primitive a <= Primitive c = a < c || a == c
-    Primitive _ <= Derivative _ _ _ = False
+    Primitive _ <= Derivative _ _ _ = True
     Derivative _ _ _ <= Nil = False
     Derivative _ _ _ <= X = False
     Derivative _ _ _ <= Primitive _ = False
@@ -117,23 +118,12 @@ instance Ord Category where
 instance Show Category where
     show Nil = "Nil"
     show X = "X"
-    show (Primitive p) = p
+    show (Primitive c) = c
     show (Derivative c1 s c2)
         | (isPrimitive c1 || isX c1) && (isPrimitive c2 || isX c2) = (show c1)++s++(show c2)
         | isDerivative c1 && (isPrimitive c2 || isX c2) = "("++(show c1)++")"++s++(show c2)
         | (isPrimitive c1 || isX c1) && isDerivative c2 = (show c1)++s++"("++(show c2)++")"
         | otherwise = "("++(show c1)++")"++s++"("++(show c2)++")"
-
--- Define the nonstrict equality between two categories, namely not considering slash types.
-cateEqual :: Category -> Category -> Bool
-cateEqual cate1 cate2
-    | isX cate1 && isX cate2 = True
-    | isX cate1 && not (isX cate2) = False
-    | not (isX cate1) && isX cate2 = False
-    | isPrimitive cate1 && isPrimitive cate2 = cate1 == cate2
-    | isPrimitive cate1 && not (isPrimitive cate2) = False
-    | not (isPrimitive cate1) && isPrimitive cate2 = False
-    | otherwise = cateEqual (leftCate cate1) (leftCate cate2) && cateEqual (rightCate cate1) (rightCate cate2)
 
 -- Besides interior functions, data constructors are not seen from outside of modules. To have access to these constructors, related functions are defined.
 nilCate :: Category
@@ -171,16 +161,16 @@ veriStrForCate str
 
 getCateFromString :: String -> Category
 getCateFromString str
-    | veriStrForCate str /= True = error $ "getCateFromString: " ++ str
+    | veriStrForCate str /= True = error $ "getCateFromString: " ++ str ++ " is not well-formated."
     | index == -1 && str == "Nil" = Nil
     | index == -1 && str == "X" = X
     | index == -1 && str == "s" = Primitive "s"
     | index == -1 && str == "np" = Primitive "np"
-    | otherwise = derivate (getCateFromString (leftStr str)) (indexOfSep str) (getCateFromString (rightStr str))
+    | otherwise = derivate (getCateFromString (leftStr str)) [str!!index] (getCateFromString (rightStr str))
         where
         index = indexOfSep 0 0 str
 
--- Get the index of middle seperator, which will be -1 for category "s" and "np".
+-- Get the index of middle seperator, which will be -1 for category "Nil", "X", "s" and "np".
 -- To remember how many left brackets have been met, the integer nlb is needed.
 -- The index is initialized as 0.
 indexOfSep :: Int -> Int -> String -> Int
@@ -214,19 +204,19 @@ rightStr str
     | otherwise = rStr
         where
         index = indexOfSep 0 0 str
-        rStr = drop (index + 2) str
+        rStr = drop (index + 1) str
 
 midSepStr :: String -> Sep
 midSepStr str
-    | index == -1 = error "midSepStr: No sep."
-    | otherwise = [str!!index, str!!(index + 1)]
+    | index == -1 = error "midSepStr: No seperator '|'."
+    | otherwise = [str!!index]
         where
         index = indexOfSep 0 0 str
 
 leftCate :: Category -> Category
 leftCate Nil = error "leftCate: Nil"
 leftCate X = error "leftCate: X"
-leftCate (Primitive a) = error "leftCate"
+leftCate (Primitive a) = error $ "leftCate: " ++ show (Primitive a)
 leftCate (Derivative cate1 _ _) = cate1
 
 rightCate :: Category -> Category
@@ -236,7 +226,9 @@ rightCate (Primitive a) = error $ "rightCate: " ++ show (Primitive a)
 rightCate (Derivative _ _ cate2) = cate2
 
 midSep :: Category -> Sep
-midSep (Primitive _) = error "midSlash"
+midSep Nil = error "midSlash: Nil"
+midSep X = error "midSlash: X"
+midSep (Primitive _) = error "midSlash: Primitive _"
 midSep (Derivative _ s _) = s
 
 derivate :: Category -> Sep -> Category -> Category

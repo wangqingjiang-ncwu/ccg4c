@@ -19,6 +19,7 @@ module CL (
     app,         -- Term -> Term -> Term
     CombAxiom,   -- Term -> Term
     combAxiom,   -- [CombAxiom]
+    aAxiom,      -- Term -> Term
     sAxiom,      -- Term -> Term
     kAxiom,      -- Term -> Term
     iAxiom,      -- Term -> Term
@@ -35,8 +36,9 @@ module CL (
     rAxiom,      -- Term -> Term
     termSeq2Term,     -- [Term] -> Term
     getTermFromStr,   -- String -> Term
-    oneStepReduct,    -- Term -> Term
-    sortTerms,        -- [Term] -> [Term]
+    sortTerms,   -- [Term] -> [Term]
+    subTermReduct,    -- Term -> Term
+    reduct,      -- Int - > Term -> Term
   ) where
 
 import Utils
@@ -151,9 +153,10 @@ app a b = JuxTerm a b
 
 type CombAxiom = Term -> Term
 combAxiom :: [CombAxiom]
-combAxiom = [sAxiom, kAxiom, iAxiom, bAxiom, tAxiom, cAxiom, wAxiom, mAxiom, yAxiom, jAxiom, b'Axiom, vAxiom, s'Axiom, rAxiom]
+combAxiom = [aAxiom, sAxiom, kAxiom, iAxiom, bAxiom, tAxiom, cAxiom, wAxiom, mAxiom, yAxiom, jAxiom, b'Axiom, vAxiom, s'Axiom, rAxiom]
 
 {- The basic and usual combinators
+ - Axy => xy
  - Sxyz => xz(yz)      Kxy => x         Ix => x
  - Bxyz => x(yz)       Txy => yx        Cxyz => xzy
  - Wxy => xyy          Mx => xx         Yx => x(Yx)
@@ -163,68 +166,72 @@ combAxiom = [sAxiom, kAxiom, iAxiom, bAxiom, tAxiom, cAxiom, wAxiom, mAxiom, yAx
 
 {- Axioms of some well-known combinators
  -}
+aAxiom :: Term -> Term
+aAxiom (JuxTerm (JuxTerm (ConstTerm "A") x) y) = app x y
+aAxiom _ = nilTerm
+
 sAxiom :: Term -> Term
 sAxiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "S") x) y) z) = JuxTerm (JuxTerm x z) (JuxTerm y z)
-sAxiom t = t
+sAxiom _ = nilTerm
 
 kAxiom :: Term -> Term
 kAxiom (JuxTerm (JuxTerm (ConstTerm "K") x) _) = x
-kAxiom t = t
+kAxiom _ = nilTerm
 
 iAxiom :: Term -> Term
 iAxiom (JuxTerm (ConstTerm "I") x) = x
-iAxiom t = t
+iAxiom _ = nilTerm
 
 bAxiom :: Term -> Term
 bAxiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "B") x) y) z) = JuxTerm x (JuxTerm y z)
-bAxiom t = t
+bAxiom _ = nilTerm
 
 tAxiom :: Term -> Term
 tAxiom (JuxTerm (JuxTerm (ConstTerm "T") x) y) = JuxTerm y x
-tAxiom t = t
+tAxiom _ = nilTerm
 
 cAxiom :: Term -> Term
 cAxiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "C") x) y) z) = JuxTerm x (JuxTerm z y)
-cAxiom t = t
+cAxiom _ = nilTerm
 
 wAxiom :: Term -> Term
 wAxiom (JuxTerm (JuxTerm (ConstTerm "W") x) y) = JuxTerm (JuxTerm x y) y
-wAxiom t = t
+wAxiom _ = nilTerm
 
 mAxiom :: Term -> Term
 mAxiom (JuxTerm (ConstTerm "M") x) = JuxTerm x x
-mAxiom t = t
+mAxiom _ = nilTerm
 
 yAxiom :: Term -> Term
 yAxiom (JuxTerm (ConstTerm "Y") x) = JuxTerm x (JuxTerm (ConstTerm "Y") x)
-yAxiom t = t
+yAxiom _ = nilTerm
 
 jAxiom :: Term -> Term
 jAxiom (JuxTerm (JuxTerm (JuxTerm (JuxTerm (ConstTerm "J") x) y) z) v)
     = JuxTerm (JuxTerm x y) (JuxTerm (JuxTerm x v) z)
-jAxiom t = t
+jAxiom _ = nilTerm
 
 b'Axiom :: Term -> Term
 b'Axiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "B'") x) y) z) = JuxTerm y (JuxTerm x z)
-b'Axiom t = t
+b'Axiom _ = nilTerm
 
 vAxiom :: Term -> Term
 vAxiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "V") x) y) z) = JuxTerm z (JuxTerm x y)
-vAxiom t = t
+vAxiom _ = nilTerm
 
 s'Axiom :: Term -> Term
 s'Axiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "S'") x) y) z) = JuxTerm (JuxTerm y z) (JuxTerm x z)
-s'Axiom t = t
+s'Axiom _ = nilTerm
 
 rAxiom :: Term -> Term
 rAxiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "R") x) y) z) = JuxTerm y (JuxTerm z x)
-rAxiom t = t
+rAxiom _ = nilTerm
 
 -- Get a term from a sequence of terms. The sequence is considered as left combination priority.
 termSeq2Term :: [Term] -> Term
 termSeq2Term [] = nilTerm
 termSeq2Term [x] = x
-termSeq2Term xs = JuxTerm (termSeq2Term (init xs)) (last xs)
+termSeq2Term xs = app (termSeq2Term (init xs)) (last xs)
 
 {- Suppose the well-formated string of a term is strict, namely not including any redundant space character.
  - A null string is well-formatted;
@@ -253,9 +260,34 @@ sortTerms [] = []
 sortTerms [x] = [x]
 sortTerms (x:xs) = (sortTerms [y | y <- xs, y <= x]) ++ [x] ++ (sortTerms [y | y <- xs, x < y])
 
-{- One-step reduction is one times of application of a certain combination axiom.
- - The application happens on a certain subterm of the input term.
- - If no subterm can reduct, namely there is no redexes, then the term is a normal form.
+{- Do one-step reduction for every subterm of a term. One-step reduction is one times of application of a certain combination axiom.
  -}
-oneStepReduct :: Term -> Term
-oneStepReduct a = a
+subTermReduct :: Term -> Term
+subTermReduct (JuxTerm (JuxTerm (ConstTerm "A") x) y) = subTermReduct $ aAxiom ((JuxTerm (JuxTerm (ConstTerm "A") x) y))
+subTermReduct (JuxTerm (JuxTerm (JuxTerm (ConstTerm "S") x) y) z) = sAxiom ((JuxTerm (JuxTerm (JuxTerm (ConstTerm "S") x) y) z))
+subTermReduct (JuxTerm (JuxTerm (ConstTerm "K") x) y) = kAxiom ((JuxTerm (JuxTerm (ConstTerm "K") x) y)
+subTermReduct (JuxTerm (ConstTerm "I") x) = iAxiom (JuxTerm (ConstTerm "I") x)
+subTermReduct (JuxTerm (JuxTerm (JuxTerm (ConstTerm "B") x) y) z) = bAxiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "B") x) y) z)
+subTermReduct (JuxTerm (JuxTerm (ConstTerm "T") x) y) = tAxiom (JuxTerm (JuxTerm (ConstTerm "T") x) y)
+subTermReduct (JuxTerm (JuxTerm (JuxTerm (ConstTerm "C") x) y) z) = cAxiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "C") x) y) z)
+subTermReduct (JuxTerm (JuxTerm (ConstTerm "W") x) y) = wAxiom (JuxTerm (JuxTerm (ConstTerm "W") x) y)
+subTermReduct (JuxTerm (ConstTerm "M") x) = mAxiom (JuxTerm (ConstTerm "M") x)
+subTermReduct (JuxTerm (ConstTerm "Y") x) = yAxiom (JuxTerm (ConstTerm "Y") x)
+subTermReduct (JuxTerm (JuxTerm (JuxTerm (JuxTerm (ConstTerm "J") x) y) z) v) = jAxiom (JuxTerm (JuxTerm (JuxTerm (JuxTerm (ConstTerm "J") x) y) z) v)
+subTermReduct (JuxTerm (JuxTerm (JuxTerm (ConstTerm "B'") x) y) z) = b'Axiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "B'") x) y) z)
+subTermReduct (JuxTerm (JuxTerm (JuxTerm (ConstTerm "V") x) y) z) = vAxiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "V") x) y) z)
+subTermReduct (JuxTerm (JuxTerm (JuxTerm (ConstTerm "S'") x) y) z) = s'Axiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "S'") x) y) z)
+subTermReduct (JuxTerm (JuxTerm (JuxTerm (ConstTerm "R") x) y) z) = rAxiom (JuxTerm (JuxTerm (JuxTerm (ConstTerm "R") x) y) z)
+subTermReduct t = t
+
+{- If a term has a normal form, namely, transitive closure of relation subTermOfTerm exists.
+ - idxMax is the maximal transitive times.
+ - If idxMax = 1, reduct completes one times of subTermReduct, which is not one-step reduction.
+ -}
+reduct :: Int -> Term -> Term
+reduct idxMax term
+    | term == term' = term
+    | idxMax > 0 = reduct (idxMax - 1) term'
+    | otherwise = term
+    where
+    term' = subTermReduct term

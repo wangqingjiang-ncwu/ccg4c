@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d74a6d35aaaa42c1dc5d4c01920f8472cd92f6ec5e168a9b4b32b05f3b2b6186
+-- hash: 678658da8ecabaf6a78f32a172b02c8cee02d821a5b907e0b6aec2ca5fd41d7c
 
 name:           ccg4c
 version:        0.1.0.0
@@ -52,9 +52,19 @@ library
 executable ccg4c-exe
   main-is: Main.hs
   other-modules:
+      AmbiResol
       Category
       CL
+      Clustering
+      Corpus
+      Database
+      Output
+      OutputTest
+      Parse
       Phrase
+      Rule
+      SentParse
+      Statistics
       Utils
       Paths_ccg4c
   hs-source-dirs:
@@ -81,10 +91,20 @@ test-suite ccg4c-test
   other-modules:
       CategorySpec
       CLSpec
+      AmbiResol
       Category
       CL
+      Clustering
+      Corpus
+      Database
       Main
+      Output
+      OutputTest
+      Parse
       Phrase
+      Rule
+      SentParse
+      Statistics
       Utils
       Paths_ccg4c
   hs-source-dirs:

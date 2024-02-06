@@ -61,6 +61,7 @@ module Utils (
     toAscListOfMapByValue,  -- [(String,Int)] -> [(String,Int)]
     isSubstr,          -- String -> String -> String -> String -> Bool
     txt2csv4WordEmbed, -- String -> IO ()
+    replaceFirstBlankByComma,     -- Bool -> String -> String
     getConfProperty,   -- String -> String -> String
     getLineUntil,      -- [String] -> IO String
     acceptOrNot,       -- a -> String -> IO Maybe a

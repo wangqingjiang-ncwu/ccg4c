@@ -3,8 +3,8 @@
 
 module Category (
     Category(..),  -- Category and its all Constructors
-    Sep,           -- String
-    seps,          -- [Sep]
+    Slash,         -- String
+    slashes,        -- [Slash]
     Prim,          -- String
     primitives,    -- [Prim]
     nilCate,       -- Category
@@ -13,18 +13,18 @@ module Category (
     npCate,        -- Category
     isNil,         -- Category -> Bool
     isX,           -- Category -> Bool
-    isPrimitive,   -- Category -> Bool
-    isDerivative,  -- Category -> Bool
+    isPrimCate,    -- Category -> Bool
+    isDeriCate,    -- Category -> Bool
     veriStrForCate,      -- String -> Bool
     getCateFromString,   --String -> Category
-    indexOfSep,    -- Int -> Int -> String -> Int
+    indexOfSlash,  -- Int -> Int -> String -> Int
     leftStr,       -- String -> String
     rightStr,      -- String -> String
-    midSepStr,     -- String -> Sep
+    midSlashStr,   -- String -> Slash
     leftCate,      -- Category -> Category
     rightCate,     -- Category -> Category
-    midSep,        -- Category -> Sep
-    derivate,      -- Category -> Sep -> Category -> Category
+    midSlash,      -- Category -> Slash
+    derivate,      -- Category -> Slash -> Category -> Category
     pronCate,      -- Category, "np"
     pronCate4Numeral,     -- Category, "np/#np"
     ndCate,        -- Category, "np\*np"
@@ -68,16 +68,32 @@ module Category (
     baPhraseCate          -- Category, "((s\#np)/#((s\.np)/.np)"
     ) where
 
-type Sep = String
-seps :: [Sep]
-seps = ["|"]
+type Slash = String
+slashes :: [Slash]
+slashes = ["/"]
 
 type Prim = String
 primitives :: [Prim]
 primitives = ["s", "np"]
 
 -- Define data type Category which is enumerable.
-data Category = Nil | X | Primitive Prim | Derivative Category Sep Category deriving (Eq)
+data Category = Nil | X | Primitive Prim | Derivative Category Slash Category
+
+-- Define relation Eq between two categories such that two categories can be compared.
+instance Eq Category where
+    Nil == Nil = True
+    Nil == X = True
+    Nil == Primitive _ = False
+    Nil == Derivative _ _ _ = False
+    X == _ = True
+    Primitive _ == Nil = False
+    Primitive _ == X = True
+    Primitive a == Primitive b =  a == b
+    Primitive _ == Derivative _ _ _ = False
+    Derivative _ _ _ == Nil = False
+    Derivative _ _ _ == X = True
+    Derivative _ _ _ == Primitive _ = False
+    Derivative a _ b == Derivative c _ d = a == c && b == d
 
 -- Define relation Ord between two categories such that two categories can be compared.
 instance Ord Category where
@@ -120,9 +136,9 @@ instance Show Category where
     show X = "X"
     show (Primitive c) = c
     show (Derivative c1 s c2)
-        | (isPrimitive c1 || isX c1) && (isPrimitive c2 || isX c2) = (show c1)++s++(show c2)
-        | isDerivative c1 && (isPrimitive c2 || isX c2) = "("++(show c1)++")"++s++(show c2)
-        | (isPrimitive c1 || isX c1) && isDerivative c2 = (show c1)++s++"("++(show c2)++")"
+        | (isPrimCate c1 || isX c1) && (isPrimCate c2 || isX c2) = (show c1)++s++(show c2)
+        | isDeriCate c1 && (isPrimCate c2 || isX c2) = "("++(show c1)++")"++s++(show c2)
+        | (isPrimCate c1 || isX c1) && isDeriCate c2 = (show c1)++s++"("++(show c2)++")"
         | otherwise = "("++(show c1)++")"++s++"("++(show c2)++")"
 
 -- Besides interior functions, data constructors are not seen from outside of modules. To have access to these constructors, related functions are defined.
@@ -146,18 +162,18 @@ isX :: Category -> Bool
 isX X = True
 isX _ = False
 
-isPrimitive :: Category -> Bool
-isPrimitive (Primitive _) = True
-isPrimitive _ = False
+isPrimCate :: Category -> Bool
+isPrimCate (Primitive _) = True
+isPrimCate _ = False
 
-isDerivative :: Category -> Bool
-isDerivative (Derivative _ _ _) = True
-isDerivative _ = False
+isDeriCate :: Category -> Bool
+isDeriCate (Derivative _ _ _) = True
+isDeriCate _ = False
 
 veriStrForCate :: String -> Bool
 veriStrForCate str
-    | indexOfSep 0 0 str == -1 = elem str ["Nil","s","np","X"]
-    | otherwise = veriStrForCate (leftStr str) && elem (midSepStr str) seps && veriStrForCate (rightStr str)
+    | indexOfSlash 0 0 str == -1 = elem str ["Nil","s","np","X"]
+    | otherwise = veriStrForCate (leftStr str) && elem (midSlashStr str) slashes && veriStrForCate (rightStr str)
 
 getCateFromString :: String -> Category
 getCateFromString str
@@ -168,19 +184,19 @@ getCateFromString str
     | index == -1 && str == "np" = Primitive "np"
     | otherwise = derivate (getCateFromString (leftStr str)) [str!!index] (getCateFromString (rightStr str))
         where
-        index = indexOfSep 0 0 str
+        index = indexOfSlash 0 0 str
 
--- Get the index of middle seperator, which will be -1 for category "Nil", "X", "s" and "np".
+-- Get the index of middle slash, which will be -1 for category "Nil", "X", "s" and "np".
 -- To remember how many left brackets have been met, the integer nlb is needed.
 -- The index is initialized as 0.
-indexOfSep :: Int -> Int -> String -> Int
-indexOfSep nlb i str
+indexOfSlash :: Int -> Int -> String -> Int
+indexOfSlash nlb i str
     | i == length str = -1
-    | x == '(' = indexOfSep (nlb + 1) (i+1) str
-    | x == ')' = indexOfSep (nlb - 1) (i+1) str
-    | x == '|' && nlb == 0 && indexOfSep nlb (i+1) str == -1 = i
-    | x == '|' && nlb == 0 && indexOfSep nlb (i+1) str /= -1 = error $ "indexOfSep: Category symbol \"" ++ str ++ "\" does not conform two-division style."
-    | otherwise = indexOfSep nlb (i+1) str
+    | x == '(' = indexOfSlash (nlb + 1) (i+1) str
+    | x == ')' = indexOfSlash (nlb - 1) (i+1) str
+    | x == '/' && nlb == 0 && indexOfSlash nlb (i+1) str == -1 = i
+    | x == '/' && nlb == 0 && indexOfSlash nlb (i+1) str /= -1 = error $ "indexOfSlash: Category symbol \"" ++ str ++ "\" does not conform two-division style."
+    | otherwise = indexOfSlash nlb (i+1) str
         where
         x = str!!i
 
@@ -192,7 +208,7 @@ leftStr str
     | head lStr == '(' && last lStr == ')' = tail (init lStr)
     | otherwise = lStr
         where
-        index = indexOfSep 0 0 str
+        index = indexOfSlash 0 0 str
         lStr = take index str
 
 rightStr :: String -> String
@@ -203,15 +219,15 @@ rightStr str
     | head rStr == '(' && last rStr == ')' = tail (init rStr)
     | otherwise = rStr
         where
-        index = indexOfSep 0 0 str
+        index = indexOfSlash 0 0 str
         rStr = drop (index + 1) str
 
-midSepStr :: String -> Sep
-midSepStr str
-    | index == -1 = error "midSepStr: No seperator '|'."
+midSlashStr :: String -> Slash
+midSlashStr str
+    | index == -1 = error "midSlashStr: Slash '/' is not found."
     | otherwise = [str!!index]
         where
-        index = indexOfSep 0 0 str
+        index = indexOfSlash 0 0 str
 
 leftCate :: Category -> Category
 leftCate Nil = error "leftCate: Nil"
@@ -225,35 +241,35 @@ rightCate X = error "rightCate: X"
 rightCate (Primitive a) = error $ "rightCate: " ++ show (Primitive a)
 rightCate (Derivative _ _ cate2) = cate2
 
-midSep :: Category -> Sep
-midSep Nil = error "midSlash: Nil"
-midSep X = error "midSlash: X"
-midSep (Primitive _) = error "midSlash: Primitive _"
-midSep (Derivative _ s _) = s
+midSlash :: Category -> Slash
+midSlash Nil = error "midSlash: Nil"
+midSlash X = error "midSlash: X"
+midSlash (Primitive _) = error "midSlash: Primitive _ does not contain any slash."
+midSlash (Derivative _ s _) = s
 
-derivate :: Category -> Sep -> Category -> Category
-derivate  cate1 sep cate2 = Derivative cate1 sep cate2
+derivate :: Category -> Slash -> Category -> Category
+derivate cate1 slash cate2 = Derivative cate1 slash cate2
 
 pronCate :: Category
 pronCate = getCateFromString "np"
 
 pronCate4Numeral :: Category
-pronCate4Numeral = getCateFromString "np|np"
+pronCate4Numeral = getCateFromString "np/np"
 
 ndCate :: Category
-ndCate = getCateFromString "np|np"
+ndCate = getCateFromString "np/np"
 
 adjCate :: Category
-adjCate = getCateFromString "np|np"
+adjCate = getCateFromString "np/np"
 
 predCate :: Category
-predCate = getCateFromString "s|np"
+predCate = getCateFromString "s/np"
 
 verbCate :: Category
-verbCate = getCateFromString "(s|np)|np"
+verbCate = getCateFromString "(s/np)/np"
 
 verbCate2 :: Category
-verbCate2 = getCateFromString "((s|np)|np)|np"
+verbCate2 = getCateFromString "((s/np)/np)/np"
 
 vCate :: [Category]
 vCate = [predCate, verbCate, verbCate2]
@@ -262,16 +278,16 @@ vpCate :: [Category]
 vpCate = [verbCate, verbCate2]
 
 advCate :: Category
-advCate = getCateFromString "(s|np)|(s|np)"
+advCate = getCateFromString "(s/np)/(s/np)"
 
 advCate4Verb :: Category
-advCate4Verb = getCateFromString "(s|np)|(s|np)"
+advCate4Verb = getCateFromString "(s/np)/(s/np)"
 
 advCate4Adj :: Category
-advCate4Adj = getCateFromString "(np|np)|(np|np)"
+advCate4Adj = getCateFromString "(np/np)/(np/np)"
 
 advCate4Sent :: Category
-advCate4Sent = getCateFromString "s|s"
+advCate4Sent = getCateFromString "s/s"
 
 advCate4DirecVerb :: Category
 advCate4DirecVerb = getCateFromString "(s\\.np)/x(s\\.np)"

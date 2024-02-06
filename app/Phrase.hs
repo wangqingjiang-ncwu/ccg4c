@@ -62,7 +62,6 @@ module Phrase (
     equalSortedPhraList,          -- [PhraCate] -> [PhraCate] -> Bool
     ) where
 
-import Data.Tuple
 import Category
 import Utils
 
@@ -124,10 +123,10 @@ nPhraCateToString nPCs = listToString $ map phraCateToString nPCs
 
 -- Create a phrasal category by given member components.
 createPhraCate :: Start -> Span -> [(Category,Tag,Seman,PhraStru,Act)] -> SecStart -> PhraCate
-createPhraCate start span ctspa secStart
-    | ctspa == [] = ((start,span),[],secStart)
-    | fst5 (ctspa!!0) == nilCate = ((start,span),[],secStart)
-    | otherwise = ((start,span),ctspa,secStart)
+createPhraCate st sp ctspa ss
+    | ctspa == [] = ((st,sp),[],ss)
+    | fst5 (ctspa!!0) == nilCate = ((st,sp),[],ss)
+    | otherwise = ((st,sp),ctspa,ss)
 
 -- Functions for extracting a member component of phrasal category.
 
@@ -249,7 +248,7 @@ pcBelong x y = (stx == sty) && (spx == spy) && (ssx == ssy) && belong
       ssy = ssOfCate y
       ctspax = ctspaOfCate x
       ctspay = ctspaOfCate y
-      belong = foldr (&&) True (map (\x -> elem x ctspay) ctspax)
+      belong = foldr (&&) True (map (\z -> elem z ctspay) ctspax)
 
 -- Another version of Function pcBelong which does not consider Act attribute.
 pcBelong' :: PhraCate -> PhraCate -> Bool
@@ -263,7 +262,7 @@ pcBelong' x y = (stx == sty) && (spx == spy) && (ssx == ssy) && belong
       ssy = ssOfCate y
       ctspx = ctspOfCate x
       ctspy = ctspOfCate y
-      belong = foldr (&&) True (map (\x -> elem x ctspy) ctspx)
+      belong = foldr (&&) True (map (\z -> elem z ctspy) ctspx)
 
 -- Get all phrases with given position and span among a set of phrases.
 getPhraBySS :: (Start, Span) -> [PhraCate] -> [PhraCate]
@@ -306,13 +305,13 @@ atomizePhraCateList (x:xs) = atomizePhraCate x ++ (atomizePhraCateList xs)
 deactOnePC :: PhraCate -> PhraCate
 deactOnePC ((st,sp),[],ss) = ((st,sp),[],ss)
 deactOnePC ((st,sp),[x],ss) = ((st,sp),[(fst5 x,snd5 x, thd5 x, fth5 x, False)],ss)
-deactOnePC ((_,_),(x:xs),_) = error "Failed to deactivate a non-atomized phrasal category."
+deactOnePC _ = error "Failed to deactivate a non-atomized phrasal category."
 
 -- activate an atomic phrasal category.
 actOnePC :: PhraCate -> PhraCate
 actOnePC ((st,sp),[],ss) = ((st,sp),[],ss)
 actOnePC ((st,sp),[x],ss) = ((st,sp),[(fst5 x,snd5 x, thd5 x, fth5 x, True)],ss)
-actOnePC ((_,_),(x:xs),_) = error "Failed to activate a non-atomized phrasal category."
+actOnePC _ = error "Failed to activate a non-atomized phrasal category."
 
 {- Define relation 'less than' between two atomic phrases, so any set of atomic phrases can be linearly ordered.
    The relation is also used to decide overlap type between two atomic phrases.
@@ -365,7 +364,7 @@ sortPhraCateBySpan pcClo = [pc| sp <- divPhraCateBySpan pcClo, pc <- sp]
 
 -- Without considering Act attribute, decide whether a phrase is NOT in a certain phrasal list.
 notElem' :: PhraCate -> [PhraCate] -> Bool
-notElem' x [] = True
+notElem' _ [] = True
 notElem' x (y:ys)
     | (stx==sty)&&(spx==spy)&&(ssx==ssy)&&(ctspx==ctspy) = False
     | otherwise = notElem' x ys
